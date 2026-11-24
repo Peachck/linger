@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   closeWindowsPrivateWorker,
+  WINDOWS_PRIVATE_PREAMBLE,
   WINDOWS_PRIVATE_SCRIPT,
+  windowsPowerShellArguments,
   windowsPrivatePath,
 } from "./windows-private.js";
 import { runProcess } from "./process.js";
@@ -330,4 +332,27 @@ it.skipIf(process.platform !== "win32")(
       reason: "UNSAFE_PARENT_ACCESS",
     });
   },
+);
+
+// Elevated runners return from Test-Administrator before the linked-token
+// check, so this compiles and calls it directly.
+it.skipIf(process.platform !== "win32")(
+  "compiles the linked-token administrator check through the production launch arguments",
+  async () => {
+    expect(WINDOWS_PRIVATE_PREAMBLE).toContain('DllImport("advapi32.dll")');
+    const powershell = path.win32.join(
+      process.env.SystemRoot ?? "C:\\Windows",
+      "System32/WindowsPowerShell/v1.0/powershell.exe",
+    );
+    const result = await runProcess(
+      powershell,
+      windowsPowerShellArguments(
+        `${WINDOWS_PRIVATE_PREAMBLE}\n[Console]::Out.Write((Test-LinkedTokenAdministrator).GetType().FullName)`,
+      ),
+      { timeoutMs: 30_000 },
+    );
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toBe("System.Boolean");
+  },
+  60_000,
 );
