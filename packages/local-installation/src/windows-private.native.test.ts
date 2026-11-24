@@ -98,12 +98,9 @@ it.skipIf(process.platform !== "win32")(
     const probe = (directory: string) =>
       runProcess(
         powershell,
-        [
-          "-NoProfile",
-          "-NonInteractive",
-          "-EncodedCommand",
-          Buffer.from(script, "utf16le").toString("base64"),
-        ],
+        // The full script as -EncodedCommand is the long command line that
+        // stalls behind some endpoint security; launch it as production does.
+        windowsPowerShellArguments(script),
         {
           input: JSON.stringify({
             path: directory,
